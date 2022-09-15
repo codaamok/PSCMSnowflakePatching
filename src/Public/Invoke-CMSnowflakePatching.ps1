@@ -431,7 +431,7 @@ function Invoke-CMSnowflakePatching {
                                 WriteCMLogEntry -Component 'Patching' -Severity 3
 
                                 foreach ($item in $Data.Updates) {
-                                    'Update "{0}" finished with evaluation state {1} and exit code {2}' -f $item.Name, [EvaluationState]$item.EvaluationState, $item.ErrorCode |
+                                    'Update "{0}" finished with evaluation state "{1}" and exit code {2}' -f $item.Name, [EvaluationState]$item.EvaluationState, $item.ErrorCode |
                                         WriteScreenInfo -Indent 1 -PassThru |
                                         WriteCMLogEntry -Component 'Patching'
                                 }
