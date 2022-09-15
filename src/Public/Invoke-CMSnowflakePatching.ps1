@@ -31,7 +31,7 @@ function Invoke-CMSnowflakePatching {
         A system can be allowed to reboot and retry multiple times with the AllowReboot or Retry parameter (or both).
 
         It is recommended you read my blog post to understand the various ways in how you can use this function: 
-        https://adamcook.io/p/Patch-Snowflakes-with-ConfigMgr-and-PowerShell
+        https://adamcook.io/p/patching-snowflakes-with-configMgr-and-powerShell
     .PARAMETER ComputerName
         Name of the remote systems you wish to invoke software update installations on.
         This parameter cannot be used with the ChooseCollection or CollectionId parameters.

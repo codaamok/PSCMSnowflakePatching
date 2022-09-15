@@ -62,7 +62,7 @@ many times software update installations were retried.
 A system can be allowed to reboot and retry multiple times with the AllowReboot or Retry parameter (or both).
 
 It is recommended you read my blog post to understand the various ways in how you can use this function: 
-https://adamcook.io/p/Patch-Snowflakes-with-ConfigMgr-and-PowerShell
+https://adamcook.io/p/patching-snowflakes-with-configMgr-and-powerShell
 
 ## EXAMPLES
 
