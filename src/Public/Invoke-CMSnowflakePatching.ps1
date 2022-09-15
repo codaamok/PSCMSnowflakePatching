@@ -145,7 +145,7 @@ function Invoke-CMSnowflakePatching {
                     $PSCmdlet.ThrowTerminatingError($_)
                 }
 
-                'Prompting user to choose a collection' | WriteScreenInfo -Indent 1 -PassThru | WriteCMLogEntry -Component 'Initialisation'
+                'Prompting user to choose a collection' | WriteScreenInfo -PassThru | WriteCMLogEntry -Component 'Initialisation'
                 $Collection = $DeviceCollections | 
                     Select-Object Name, CollectionID, MemberCount, Comment | 
                     Out-GridView -Title 'Choose a Configuration Manager collection' -PassThru
