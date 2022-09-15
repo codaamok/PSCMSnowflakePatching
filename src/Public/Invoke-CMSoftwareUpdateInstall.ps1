@@ -81,7 +81,7 @@ function Invoke-CMSoftwareUpdateInstall {
                     [System.Management.Automation.ErrorCategory]::InvalidResult,
                     $ComputerName
                 )
-                $PSCmdlet.ThrowTerminatingError($ErrorRecord)
+                throw $ErrorRecord
             }
         }
         catch {

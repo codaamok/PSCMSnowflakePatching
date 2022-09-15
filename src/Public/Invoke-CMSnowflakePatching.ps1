@@ -175,7 +175,7 @@ function Invoke-CMSnowflakePatching {
                             [System.Management.Automation.ErrorCategory]::ObjectNotFound,
                             $ComputerName
                         )
-                        $PSCmdlet.ThrowTerminatingError($ErrorRecord)                    
+                        throw $ErrorRecord                  
                     }
                     else {
                         'Success' | WriteScreenInfo -Indent 1 -PassThru | WriteCMLogEntry -Component 'Initialisation'
