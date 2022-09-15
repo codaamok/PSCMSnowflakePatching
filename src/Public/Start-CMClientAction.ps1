@@ -4,10 +4,14 @@ function Start-CMClientAction {
         Invoke a Configuration Manager client action on a local or remote client, see https://docs.microsoft.com/en-us/mem/configmgr/develop/reference/core/clients/client-classes/triggerschedule-method-in-class-sms_client.
     .DESCRIPTION
         Invoke a Configuration Manager client action on a local or remote client, see https://docs.microsoft.com/en-us/mem/configmgr/develop/reference/core/clients/client-classes/triggerschedule-method-in-class-sms_client.
+
+        This function is called by Invoke-CMSnowflakePatching.
     .PARAMETER ComputerName
         Name of the remote system you wish to invoke this action on. If omitted, it will execute on localhost.
     .PARAMETER ScheduleId 
         Name of a schedule ID to invoke, see https://docs.microsoft.com/en-us/mem/configmgr/develop/reference/core/clients/client-classes/triggerschedule-method-in-class-sms_client.
+
+        Tab complete to cycle through all the possible options, however the names are the same as per the linked doc but with spaces removed.
     .EXAMPLE
         Start-CMClientAction -ScheduleId ScanByUpdateSource
 

@@ -4,6 +4,10 @@ function Get-CMSoftwareUpdates {
         Retrieve all of the software updates available on a local or remote client.
     .DESCRIPTION
         Retrieve all of the software updates available on a local or remote client.
+
+        This function is called by Invoke-CMSnowflakePatching.
+
+        The software updates are retrieved from the CCM_SoftwareUpdate WMI class, including all its properties.
     .PARAMETER ComputerName
         Name of the remote system you wish to retrieve available software updates from. If omitted, it will execute on localhost.
     .PARAMETER Filter

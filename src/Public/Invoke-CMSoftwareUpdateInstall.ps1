@@ -5,9 +5,12 @@ function Invoke-CMSoftwareUpdateInstall {
     .DESCRIPTION
         Initiate the installation of available software updates for a local or remote client. 
 
-        The function returns all the software updates in their final state after installation is complete, success or failure.
+        This function is called by Invoke-CMSnowflakePatching.
 
-        The function processes syncronously, therefore it waits until the installation is complete, success or failure. 
+        After installation is complete, regardless of success or failure, a CimInstance object from the CCM_SoftwareUpdate
+        class is returned with the update(s) final state.
+
+        The function processes syncronously, therefore it waits until the installation is complete.
 
         The function will timeout by default after 5 minutes waiting for the available updates to begin downloading/installing,
         and  120 minutes of waiting for software updates to finish installing. These timeouts are configurable via parameters 
@@ -15,7 +18,7 @@ function Invoke-CMSoftwareUpdateInstall {
     .PARAMETER ComputerName
         Name of the remote system you wish to invoke the software update installation on. If omitted, localhost will be targetted.
     .PARAMETER Update
-        A CimInstance object of updates, from the CCM_SoftwareUpdate class, of the updates you wish to invoke on the target system.
+        A CimInstance object, from the CCM_SoftwareUpdate class, of the updates you wish to invoke on the target system.
 
         Use the Get-CMSoftwareUpdates function to get this object for this parameter.
     .PARAMETER InvokeSoftwareUpdateInstallTimeoutMins
@@ -47,10 +50,9 @@ function Invoke-CMSoftwareUpdateInstall {
         [Int]$InstallUpdatesTimeoutMins = 120
     )
 
-    New-LoopAction -LoopTimeout $InvokeSoftwareUpdateInstallTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
+    NewLoopAction -LoopTimeout $InvokeSoftwareUpdateInstallTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
         try {
             $CimSplat = @{
-                CimSession   = $CimSession
                 Namespace    = 'root\CCM\ClientSDK'
                 ClassName    = 'CCM_SoftwareUpdatesManager'
                 Name         = 'InstallUpdates'
@@ -60,15 +62,15 @@ function Invoke-CMSoftwareUpdateInstall {
                 ErrorAction  = 'Stop'
             }
 
-            if ($PSBoundParameters.ContainsKey('ComputerName')) {
+            if (-not [String]::IsNullOrWhiteSpace($ComputerName)) {
                 $Options = New-CimSessionOption -Protocol 'DCOM'
                 $CimSplat['CimSession'] = New-CimSession -ComputerName $ComputerName -SessionOption $Options -ErrorAction 'Stop'
             }
 
             $Result = Invoke-CimMethod @CimSplat
 
-            if ($PSBoundParameters.ContainsKey('ComputerName')) {
-                Remove-CimSession $CimSession -ErrorAction 'Stop'
+            if (-not [String]::IsNullOrWhiteSpace($ComputerName)) {
+                Remove-CimSession $CimSplat['CimSession'] -ErrorAction 'Stop'
             }
 
             if ($Result.ReturnValue -ne 0) {
@@ -94,7 +96,7 @@ function Invoke-CMSoftwareUpdateInstall {
                 ErrorAction  = 'Stop'
             }
 
-            if ($PSBoundParameters.ContainsKey('ComputerName')) {
+            if (-not [String]::IsNullOrWhiteSpace($ComputerName)) {
                 $Splat['ComputerName'] = $ComputerName
             }
 
@@ -120,7 +122,7 @@ function Invoke-CMSoftwareUpdateInstall {
         $PSCmdlet.ThrowTerminatingError($ErrorRecord)
     }
 
-    New-LoopAction -LoopTimeout $InstallUpdatesTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
+    NewLoopAction -LoopTimeout $InstallUpdatesTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
         # Until all triggered updates are no longer in a state of downloading/installing
     } -ExitCondition {
         try {
@@ -129,7 +131,7 @@ function Invoke-CMSoftwareUpdateInstall {
                 ErrorAction  = 'Stop'
             }
 
-            if ($PSBoundParameters.ContainsKey('ComputerName')) {
+            if (-not [String]::IsNullOrWhiteSpace($ComputerName)) {
                 $Splat['ComputerName'] = $ComputerName
             }
 

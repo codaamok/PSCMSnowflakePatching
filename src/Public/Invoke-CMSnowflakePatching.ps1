@@ -10,31 +10,46 @@ function Invoke-CMSnowflakePatching {
 
         You can pass a single, or array of, computer names, or you can specify a ConfigMgr collection ID. Alternatively,
         you can use the ChooseCollection switch which will present a searchable list of all ConfigMgr device collections
-        to choose from.
+        to choose from in an Out-GridView window.
 
-        If multiple ConfigMgr clients are in scope, all will be processed and monitored asyncronously using jobs.
+        If ComputerName, ChooseCollection, and CollectionId parameters are not used, the ChooseCollection is the default
+        parameter set.
+
+        If multiple ConfigMgr clients are in scope, all will be processed and monitored asyncronously using jobs. The
+        function will not immediately return. It will wait until all jobs are no longer running.
 
         Progress will be written as host output to the console, and log file in the %temp% directory.
 
         An output pscustomobject will be returned at the end if either the ComputerName or CollectionId parameters
-        were used. An object per client will contain properties such as result, updates installed, whether a pending
-        reboot is required, and how many times a system rebooted (via the Retry parameter).
+        were used. If the ChooseCollection switch was used, no output object is returned (progress will still be written
+        to the host). 
+        
+        There will be an output object per target client. It will contain properties such as result, updates installed, 
+        whether a pending reboot is required, and how many times a system rebooted and how
+        many times software update installations were retried.
+
+        A system can be allowed to reboot and retry multiple times with the AllowReboot or Retry parameter (or both).
 
         It is recommended you read my blog post to understand the various ways in how you can use this function: 
         https://adamcook.io/p/Patch-Snowflakes-with-ConfigMgr-and-PowerShell
     .PARAMETER ComputerName
-        One or more names of computers you want to patch.
+        Name of the remote systems you wish to invoke software update installations on.
+        This parameter cannot be used with the ChooseCollection or CollectionId parameters.
     .PARAMETER ChooseCollection
         A PowerShell Out-GridView window will appear, prompting you to choose a ConfigMgr device collection. 
         All members of this collection will be patched.
+        This parameter cannot be used with the ComputerName or CollectionId parameters.
     .PARAMETER CollectionId
         A ConfigMgr collection ID of whose members you intend to patch.
+        All members of this collection will be patched.
+        This parameter cannot be used with the ComputerName or ChooseCollection parameters.
     .PARAMETER AllowReboot
         If an update returns a soft or hard pending reboot, specifying this switch will allow the system to be rebooted
-        after all updates have finished installing. By default, no reboots will occur. More often than not, reboots are
-        required in order to finalise software update installation.
+        after all updates have finished installing. By default, the function will not reboot the system(s). 
+        More often than not, reboots are required in order to finalise software update installation. Using this switch
+        and allowing the system(s) to reboot if required ensures a complete patch cycle.
     .PARAMETER Retry
-        Specify the number of iterations you would like to script to make in order to retry when a failure is detected.
+        Specify the number of retries you would like to script to make when a software update install failure is detected.
         In other words, if software updates fail to install, and you specify 2 for the Retry parameter, the script will
         retry installation twice.
     .EXAMPLE
@@ -152,7 +167,19 @@ function Invoke-CMSnowflakePatching {
                 'Getting collection {0}' -f $CollectionId | WriteScreenInfo -PassThru | WriteCMLogEntry -Component 'Initialisation'
                 try {
                     $Collection = Get-CMCollection -Id $CollectionId -CollectionType 'Device' -ErrorAction 'Stop'
-                    'Success' | WriteScreenInfo -Indent 1 -PassThru | WriteCMLogEntry -Component 'Initialisation'
+                    if ($null -eq $Collection) {
+                        $Exception = [System.ArgumentException]::new('Did not find a device collection with ID {0}' -f $CollectionId)
+                        $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
+                            $Exception,
+                            $null,
+                            [System.Management.Automation.ErrorCategory]::ObjectNotFound,
+                            $ComputerName
+                        )
+                        $PSCmdlet.ThrowTerminatingError($ErrorRecord)                    
+                    }
+                    else {
+                        'Success' | WriteScreenInfo -Indent 1 -PassThru | WriteCMLogEntry -Component 'Initialisation'
+                    }
                 }
                 catch {
                     'Failed to get collection {0}' -f $CollectionId | 
@@ -212,6 +239,8 @@ function Invoke-CMSnowflakePatching {
                     [Int]$InstallUpdatesTimeoutMins
                 )
 
+                $Module = Get-Module 'PSCMSnowflakePatching'
+
                 $Updates = Get-CMSoftwareUpdates -ComputerName $ComputerName -Filter 'ComplianceState = 0' -ErrorAction 'Stop'
                 
                 [CimInstance[]]$AvailableUpdates         = $Updates | Where-Object { 0,1 -contains $_.EvaluationState             }
@@ -223,15 +252,18 @@ function Invoke-CMSnowflakePatching {
                 #[CimInstance[]]$OtherUpdates             = $Updates | Where-Object { $_.EvaluationState -notmatch '^[0-9][1-3]?$' }
         
                 if ($AvailableUpdates.Count -gt 0 -Or $FailedUpdates.Count -gt 0) {
-                    $Script:UpdatesToInstall = $Updates | Where-Object { 0,1,13 -contains $_.EvaluationState }
+                    $UpdatesToInstall = $Updates | Where-Object { 0,1,13 -contains $_.EvaluationState }
 
                     $Iterations = if (-not $AllowReboot -Or $Retry -lt 1) { 1 } else { $Retry }
-                    $Script:RebootCounter = 0
+                    $RebootCounter   = 0
+                    $AttemptsCounter = 0
 
-                    NewLoopAction -Iterations $Iterations -LoopDelay 0 -ScriptBlock {
+                    & $Module NewLoopAction -Iterations $Iterations -LoopDelay 0 -ScriptBlock {
+                        $AttemptsCounter++
+
                         $InvokeCMSoftwareUpdateInstallSplat = @{
                             ComputerName                           = $ComputerName
-                            Update                                 = $Script:UpdatesToInstall
+                            Update                                 = $UpdatesToInstall
                             InvokeSoftwareUpdateInstallTimeoutMins = $InvokeSoftwareUpdateInstallTimeoutMins
                             InstallUpdatesTimeoutMins              = $InstallUpdatesTimeoutMins
                             ErrorAction                            = 'Stop'
@@ -239,20 +271,20 @@ function Invoke-CMSnowflakePatching {
                         $Result = Invoke-CMSoftwareUpdateInstall @InvokeCMSoftwareUpdateInstallSplat
                         
                         if ($AllowReboot -And $Result.EvaluationState -match '^8$|^9$|^10$') {
-                            $Script:RebootCounter++
+                            $RebootCounter++
 
                             Restart-Computer -ComputerName $ComputerName -Force -ErrorAction 'Stop'
 
-                            NewLoopAction -LoopTimeout $RebootTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
+                            & $Module NewLoopAction -LoopTimeout $RebootTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
                                 # Wait for SMS Agent Host to startup and for relevant ConfigMgr WMI classes to become available
                             } -ExitCondition {
                                 try {
-                                    $null = Get-CMSoftwareUpdates -ComputerName $Script:ComputerName -ErrorAction 'Stop'
+                                    $null = Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop'
                                     return $true
                                 }
                                 catch {}
                             } -IfTimeoutScript {
-                                $Exception = [System.TimeoutException]::new('Timeout while waiting for {0} to reboot' -f $Script:ComputerName)
+                                $Exception = [System.TimeoutException]::new('Timeout while waiting for {0} to reboot' -f $ComputerName)
                                 $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
                                     $Exception,
                                     $null,
@@ -264,11 +296,11 @@ function Invoke-CMSnowflakePatching {
                             
                         }
                     } -ExitCondition {
-                        NewLoopAction -LoopTimeout $SoftwareUpdateScanCycleTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 1 -LoopDelayType 'Seconds' -ScriptBlock { } -ExitCondition {
+                        & $Module NewLoopAction -LoopTimeout $SoftwareUpdateScanCycleTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 1 -LoopDelayType 'Seconds' -ScriptBlock { } -ExitCondition {
                             try {
-                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId '{00000000-0000-0000-0000-000000000113}' -ErrorAction 'Stop'
+                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
                                 Start-Sleep -Seconds 180
-                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId '{00000000-0000-0000-0000-000000000113}' -ErrorAction 'Stop'
+                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
                                 Start-Sleep -Seconds 180
                                 return $true
                             }
@@ -282,7 +314,7 @@ function Invoke-CMSnowflakePatching {
                                 }
                             }
                         } -IfTimeoutScript {
-                            $Exception = [System.TimeoutException]::new('Timeout while trying to invoke Software Update Scan Cycle for {0}' -f $Script:ComputerName)
+                            $Exception = [System.TimeoutException]::new('Timeout while trying to invoke Software Update Scan Cycle for {0}' -f $ComputerName)
                             $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
                                 $Exception,
                                 $null,
@@ -292,7 +324,7 @@ function Invoke-CMSnowflakePatching {
                             $PSCmdlet.ThrowTerminatingError($ErrorRecord)
                         }
 
-                        $Filter = 'ArticleID = "{0}"' -f [String]::Join('" OR ArticleID = "', $Script:UpdatesToInstall.ArticleID)
+                        $Filter = 'ArticleID = "{0}"' -f [String]::Join('" OR ArticleID = "', $UpdatesToInstall.ArticleID)
                         
                         $LatestUpdates = Get-CMSoftwareUpdates -ComputerName $ComputerName -Filter $Filter -ErrorAction 'Stop'
 
@@ -318,17 +350,19 @@ function Invoke-CMSnowflakePatching {
                         [PSCustomObject]@{
                             ComputerName    = $ComputerName
                             Result          = 'Failure'
-                            Updates         = $Script:LatestUpdates | Select-Object Name, ArticleID, EvaluationState, ErrorCode
-                            IsPendingReboot = $Script:LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
-                            NumberOfReboots = $Script:RebootCounter
+                            Updates         = $LatestUpdates | Select-Object Name, ArticleID, EvaluationState, ErrorCode
+                            IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
+                            NumberOfReboots = $RebootCounter
+                            NumberOfRetries = $AttemptsCounter - 1
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
                             ComputerName    = $ComputerName
                             Result          = 'Success'
-                            Updates         = $Script:UpdatesToInstall | Select-Object Name, ArticleID, EvaluationState
-                            IsPendingReboot = $Script:LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
-                            NumberOfReboots = $Script:RebootCounter
+                            Updates         = $UpdatesToInstall | Select-Object Name, ArticleID, EvaluationState
+                            IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
+                            NumberOfReboots = $RebootCounter
+                            NumberOfRetries = $AttemptsCounter - 1
                         }
                     }
                 }
@@ -339,6 +373,7 @@ function Invoke-CMSnowflakePatching {
                         Updates         = $null
                         IsPendingReboot = $false
                         NumberOfReboots = 0
+                        NumberOfRetries = 0
                     }
                 }
             }
@@ -430,7 +465,10 @@ function Invoke-CMSnowflakePatching {
             }
         } until (
             $Jobs.Where{$_.State -eq 'Running'}.Count -eq 0 -And 
-            $CompletedJobs.Count -eq $Jobs.Where{$_.State -eq 'Completed'}.Count
+            (
+                ($CompletedJobs.Count -eq $Jobs.Where{$_.State -eq 'Completed'}.Count -And $CompletedJobs.Count -gt 0) -Or
+                ($FailedJobs.Count -eq $Jobs.Where{$_.State -eq 'Failed'}.Count -And $FailedJobs.Count -gt 0)
+            )
         )
     }
 

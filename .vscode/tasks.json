@@ -23,7 +23,7 @@
             "label": "Build (with docs)",
             "type": "process",
             "command": "powershell",
-            "args": ["-noprofile","-command","Invoke-Build","-File","./invoke.build.ps1","-Author","'codaamok'","-ModuleName","'PSCMSnowflakePatching'","-UpdateDocs"],
+            "args": ["-noprofile","-command","Invoke-Build","-File","./invoke.build.ps1","-Author","'codaamok'","-ModuleName","'PSCMSnowflakePatching'","-UpdateDocs","$true"],
             "group": {
                 "kind": "build",
                 "isDefault": true
