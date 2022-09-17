@@ -101,7 +101,7 @@ function Invoke-CMSnowflakePatching {
                 $true
             }
         })]
-        [Int]$Retry = 1
+        [Int]$Retry
     )
 
     #region Define PSDefaultParameterValues, other variables, and enums
@@ -224,6 +224,16 @@ function Invoke-CMSnowflakePatching {
                 Name = $Computer
             }
         }
+    }
+
+    # 'Retry' actually means number of attempts, which will default to 1
+    # This is a juggling act of trying to simplify UX in the -Retry parameter name
+    # versus my stubborn and tiredness to think of something better
+    $Retry = if ($PSBoundParameters.ContainsKey('Retry')) {
+        if ($Retry -eq 1) { 2 } else { $Retry }
+    }
+    else {
+        1
     }
 
     $Jobs = foreach ($Member in $CollectionMembers) {
@@ -419,7 +429,7 @@ function Invoke-CMSnowflakePatching {
                             )
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter
+                            NumberOfRetries = $AttemptsCounter - 1
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
@@ -428,7 +438,7 @@ function Invoke-CMSnowflakePatching {
                             Updates         = $AllUpdates.Values | Select-Object Name, ArticleID
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter
+                            NumberOfRetries = $AttemptsCounter - 1
                         }
                     }
                 }
