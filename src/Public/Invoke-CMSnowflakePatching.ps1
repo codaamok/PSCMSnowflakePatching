@@ -93,6 +93,14 @@ function Invoke-CMSnowflakePatching {
         [Switch]$AllowReboot,
 
         [Parameter()]
+        [ValidateScript({
+            if ($_ -lt 1) {
+                throw 'Retry cannot be less than 1'
+            }
+            else {
+                $true
+            }
+        })]
         [Int]$Retry = 1
     )
 
@@ -227,7 +235,8 @@ function Invoke-CMSnowflakePatching {
                 $AllowReboot.IsPresent, 
                 $Retry, 
                 $InvokeSoftwareUpdateInstallTimeoutMins, 
-                $InstallUpdatesTimeoutMins
+                $InstallUpdatesTimeoutMins,
+                $RebootTimeoutMins
             )
             ErrorAction          = 'Stop'
             ScriptBlock          = {
@@ -236,30 +245,40 @@ function Invoke-CMSnowflakePatching {
                     [Bool]$AllowReboot,
                     [Int]$Retry,
                     [Int]$InvokeSoftwareUpdateInstallTimeoutMins,
-                    [Int]$InstallUpdatesTimeoutMins
+                    [Int]$InstallUpdatesTimeoutMins,
+                    [Int]$RebootTimeoutMins
                 )
 
                 $Module = Get-Module 'PSCMSnowflakePatching'
 
-                $Updates = Get-CMSoftwareUpdates -ComputerName $ComputerName -Filter 'ComplianceState = 0' -ErrorAction 'Stop'
-                
-                [CimInstance[]]$AvailableUpdates         = $Updates | Where-Object { 0,1 -contains $_.EvaluationState             }
-                [CimInstance[]]$FailedUpdates            = $Updates | Where-Object { $_.EvaluationState -eq 13                    }
-                #[CimInstance[]]$UpdatesInprogress        = $Updates | Where-Object { 2..7 + 11 -contains $_.EvaluationState       }
-                #[CimInstance[]]$PendingSoftRebootUpdates = $Updates | Where-Object { 8, 10 -contains $_.EvaluationState           }
-                #[CimInstance[]]$PendingHardRebootUpdates = $Updates | Where-Object { $_.EvaluationState -eq 9                     }
-                #[CimInstance[]]$InstallComplete          = $Updates | Where-Object { $_.EvaluationState -eq 12                    }
-                #[CimInstance[]]$OtherUpdates             = $Updates | Where-Object { $_.EvaluationState -notmatch '^[0-9][1-3]?$' }
-        
-                if ($AvailableUpdates.Count -gt 0 -Or $FailedUpdates.Count -gt 0) {
-                    $UpdatesToInstall = $Updates | Where-Object { 0,1,13 -contains $_.EvaluationState }
-
-                    $Iterations = if (-not $AllowReboot -Or $Retry -lt 1) { 1 } else { $Retry }
+                $GetCMSoftwareUpdatesSplat = @{
+                    ComputerName = $ComputerName
+                    Filter       = 'ComplianceState = 0 AND (EvaluationState = 0 OR EvaluationState = 1 OR EvaluationState = 13)'
+                    ErrorAction  = 'Stop'
+                }
+                [CimInstance[]]$UpdatesToInstall = Get-CMSoftwareUpdates @GetCMSoftwareUpdatesSplat
+                        
+                if ($UpdatesToInstall.Count -gt 0) {
+                    $Iterations      = $Retry
                     $RebootCounter   = 0
                     $AttemptsCounter = 0
+                    $AllUpdates      = @{}
 
-                    & $Module NewLoopAction -Iterations $Iterations -LoopDelay 0 -ScriptBlock {
+                    & $Module NewLoopAction -Iterations $Iterations -LoopDelay 30 -LoopDelayType 'Seconds' -ScriptBlock {
                         $AttemptsCounter++
+
+                        if ($AttemptsCounter -gt 1) {
+                            # Get a fresh collection of available updates to install because if some updates successfully installed _and_ failed 
+                            # in the last iteration then we will get an error about trying to install updates that are already installed, whereas
+                            # it's just the failed ones we want to retry, or any other new updates that have all of a sudden became available since
+                            # the last iteration
+                            [CimInstance[]]$UpdatesToInstall = Get-CMSoftwareUpdates @GetCMSoftwareUpdatesSplat
+                        }
+
+                        # Keep track of all updates processed and only keeping their last state in WMI for reporting back the overal summary later
+                        foreach ($Update in $UpdatesToInstall) {
+                            $AllUpdates[$Update.UpdateID] = $Update
+                        }
 
                         $InvokeCMSoftwareUpdateInstallSplat = @{
                             ComputerName                           = $ComputerName
@@ -268,19 +287,33 @@ function Invoke-CMSnowflakePatching {
                             InstallUpdatesTimeoutMins              = $InstallUpdatesTimeoutMins
                             ErrorAction                            = 'Stop'
                         }
-                        $Result = Invoke-CMSoftwareUpdateInstall @InvokeCMSoftwareUpdateInstallSplat
+                        [CimInstance[]]$Result = Invoke-CMSoftwareUpdateInstall @InvokeCMSoftwareUpdateInstallSplat
                         
                         if ($AllowReboot -And $Result.EvaluationState -match '^8$|^9$|^10$') {
                             $RebootCounter++
 
-                            Restart-Computer -ComputerName $ComputerName -Force -ErrorAction 'Stop'
+                            Restart-Computer -ComputerName $ComputerName -Force -Wait -ErrorAction 'Stop'
 
                             & $Module NewLoopAction -LoopTimeout $RebootTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
                                 # Wait for SMS Agent Host to startup and for relevant ConfigMgr WMI classes to become available
                             } -ExitCondition {
                                 try {
-                                    $null = Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop'
-                                    return $true
+                                    #$null = Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop'
+                                    #return $true
+                                    $Splat = @{
+                                        ComputerName = $ComputerName
+                                        ClassName    = 'Win32_Service'
+                                        Filter       = 'Name = "ccmexec" OR Name = "winmgmt" OR Name = "netlogon"'
+                                    }
+                                    $ServicesState = Get-CimInstance @Splat
+    
+                                    if (
+                                        $ServicesState.Count -eq 3 -And 
+                                        ($ServicesState.State -eq 'Running').Count -eq 3 -And
+                                        (Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop')
+                                    ) {
+                                        return $true
+                                    }
                                 }
                                 catch {}
                             } -IfTimeoutScript {
@@ -296,37 +329,63 @@ function Invoke-CMSnowflakePatching {
                             
                         }
                     } -ExitCondition {
-                        & $Module NewLoopAction -LoopTimeout $SoftwareUpdateScanCycleTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 1 -LoopDelayType 'Seconds' -ScriptBlock { } -ExitCondition {
-                            try {
-                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
-                                Start-Sleep -Seconds 180
-                                Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
-                                Start-Sleep -Seconds 180
-                                return $true
-                            }
-                            catch {
-                                if ($_.FullyQualifiedErrorId -match '0x80070005|0x80041001') {
-                                    # If ccmexec service hasn't started yet, or is still starting, access denied is thrown
-                                    return $false
+                        if ($Result.EvaluationState -notmatch '^8$|^9$|^13$') {
+                            # Don't bother doing ScanByUpdateSource if all the updates are in failed or pending reboot state
+                            # The point of this is to get updates out of WMI if they're successful/complete w/o pending reboot
+                            & $Module NewLoopAction -LoopTimeout $SoftwareUpdateScanCycleTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 1 -LoopDelayType 'Seconds' -ScriptBlock { } -ExitCondition {
+                                try {
+                                    Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
+                                    Start-Sleep -Seconds 180
+                                    Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
+                                    Start-Sleep -Seconds 180
+                                    return $true
                                 }
-                                else {
-                                    $PSCmdlet.ThrowTerminatingError($_)
+                                catch {
+                                    if ($_.FullyQualifiedErrorId -match '0x80070005|0x80041001' -Or $_.Exception.Message -match '0x80070005|0x80041001') {
+                                        # If ccmexec service hasn't started yet, or is still starting, access denied is thrown
+                                        return $false
+                                    }
+                                    else {
+                                        $PSCmdlet.ThrowTerminatingError($_)
+                                    }
                                 }
+                            } -IfTimeoutScript {
+                                $Exception = [System.TimeoutException]::new('Timeout while trying to invoke Software Update Scan Cycle for {0}' -f $ComputerName)
+                                $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
+                                    $Exception,
+                                    $null,
+                                    [System.Management.Automation.ErrorCategory]::OperationTimeout,
+                                    $ComputerName
+                                )
+                                $PSCmdlet.ThrowTerminatingError($ErrorRecord)
                             }
-                        } -IfTimeoutScript {
-                            $Exception = [System.TimeoutException]::new('Timeout while trying to invoke Software Update Scan Cycle for {0}' -f $ComputerName)
-                            $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
-                                $Exception,
-                                $null,
-                                [System.Management.Automation.ErrorCategory]::OperationTimeout,
-                                $ComputerName
-                            )
-                            $PSCmdlet.ThrowTerminatingError($ErrorRecord)
                         }
 
-                        $Filter = 'ArticleID = "{0}"' -f [String]::Join('" OR ArticleID = "', $UpdatesToInstall.ArticleID)
+                        $Filter = 'UpdateID = "{0}"' -f [String]::Join('" OR UpdateID = "', $UpdatesToInstall.UpdateID)
                         
-                        $LatestUpdates = Get-CMSoftwareUpdates -ComputerName $ComputerName -Filter $Filter -ErrorAction 'Stop'
+                        try {
+                            $LatestUpdates = Get-CMSoftwareUpdates -ComputerName $ComputerName -Filter $Filter -ErrorAction 'Stop'
+                        }
+                        catch {
+                            $PSCmdlet.ThrowTerminatingError($_)
+                        }
+
+                        # Keep track of all updates processed and only keeping their last state in WMI for reporting back the overal summary later
+                        foreach ($Update in $AllUpdates.Values) {
+                            if ($LatestUpdates.UpdateID -contains $Update.UpdateID) {
+                                # If update is still in WMI, update its state/error code in the hashtable tracker for reporting summary later on
+                                $x = $LatestUpdates | Where-Object { $_.UpdateID -eq $Update.UpdateID }
+                                $Update.EvaluationState = [EvaluationState]$x.EvaluationState
+                                $Update.ErrorCode       = $x.ErrorCode
+                                $Update | Add-Member -MemberType NoteProperty -Name 'EvaluationStateStr' -Value ([EvaluationState]$x.EvaluationState).ToString() -Force
+                            }
+                            else {
+                                # If the update is no longer in WMI, assume its state is installed and force EvaluationState to be 12 for reporting summary later on
+                                $Update.EvaluationState = [EvaluationState]12
+                                $Update.ErrorCode       = 0
+                                $Update | Add-Member -MemberType NoteProperty -Name 'EvaluationStateStr' -Value ([EvaluationState]12).ToString() -Force
+                            }
+                        }
 
                         switch ($AllowReboot) {
                             $true {
@@ -335,12 +394,14 @@ function Invoke-CMSnowflakePatching {
                             }
                             $false {
                                 # Don't want anything other than pending hard/soft reboot, or installed
-                                # Ideally, the update(s) should no longer be present in WMI if they're installed w/o reboot required, or be in a state of pending reboot which is OK
+                                # Ideally, the update(s) should no longer be present in WMI if they're installed w/o reboot required, 
+                                # or be in a state of pending reboot which is OK
                                 $NotWant = '^{0}$' -f ([String]::Join('$|^', 0..7+10+11+13..23))
                                 if (@($LatestUpdates.EvaluationState -match $NotWant).Count -eq 0) { 
                                     return $true 
                                 } else { 
-                                    # If this occurs, the iterations on the loop will exceed and the IfTimeoutScript script block will be invoked, thus reporting back one or more updates failed
+                                    # If this occurs, the iterations on the loop will exceed and the IfTimeoutScript script block will be invoked, 
+                                    # thus reporting back one or more updates failed
                                     return $false 
                                 }
                             }
@@ -350,19 +411,24 @@ function Invoke-CMSnowflakePatching {
                         [PSCustomObject]@{
                             ComputerName    = $ComputerName
                             Result          = 'Failure'
-                            Updates         = $LatestUpdates | Select-Object Name, ArticleID, EvaluationState, ErrorCode
+                            Updates         = $AllUpdates.Values | Select-Object -Property @(
+                                "Name"
+                                "ArticleID"
+                                @{Name = 'EvaluationState'; Expression = { $_.EvaluationStateStr }}
+                                "ErrorCode"
+                            )
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter - 1
+                            NumberOfRetries = $AttemptsCounter
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
                             ComputerName    = $ComputerName
                             Result          = 'Success'
-                            Updates         = $UpdatesToInstall | Select-Object Name, ArticleID, EvaluationState
+                            Updates         = $AllUpdates.Values | Select-Object Name, ArticleID
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter - 1
+                            NumberOfRetries = $AttemptsCounter
                         }
                     }
                 }
@@ -379,7 +445,9 @@ function Invoke-CMSnowflakePatching {
             }
         }
 
-        'Creating an async job to patch{0} {1}' -f $(if ($AllowReboot) { ' and reboot'} else { }), $Member.Name | WriteScreenInfo -PassThru | WriteCMLogEntry -Component 'Jobs'
+        'Creating an async job to patch{0} {1}' -f $(if ($AllowReboot) { ' and reboot'} else { }), $Member.Name | 
+            WriteScreenInfo -PassThru | 
+            WriteCMLogEntry -Component 'Jobs'
 
         try {
             Start-Job @StartJobSplat
@@ -431,7 +499,9 @@ function Invoke-CMSnowflakePatching {
                                 WriteCMLogEntry -Component 'Patching' -Severity 3
 
                                 foreach ($item in $Data.Updates) {
-                                    'Update "{0}" finished with evaluation state "{1}" and exit code {2}' -f $item.Name, [EvaluationState]$item.EvaluationState, $item.ErrorCode |
+                                    'Update "{0}" finished with evaluation state "{1}" and exit code {2}' -f $item.Name, 
+                                                                                                             $item.EvaluationState,
+                                                                                                             $item.ErrorCode |
                                         WriteScreenInfo -Indent 1 -PassThru |
                                         WriteCMLogEntry -Component 'Patching'
                                 }

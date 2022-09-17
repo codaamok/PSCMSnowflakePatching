@@ -50,7 +50,7 @@ function Invoke-CMSoftwareUpdateInstall {
         [Int]$InstallUpdatesTimeoutMins = 120
     )
 
-    NewLoopAction -LoopTimeout $InvokeSoftwareUpdateInstallTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
+    NewLoopAction -Name 'Initiate software update install' -LoopTimeout $InvokeSoftwareUpdateInstallTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 5 -LoopDelayType 'Seconds' -ScriptBlock {
         try {
             $CimSplat = @{
                 Namespace    = 'root\CCM\ClientSDK'
@@ -85,14 +85,14 @@ function Invoke-CMSoftwareUpdateInstall {
             }
         }
         catch {
-            if ($_.FullyQualifiedErrorId -notmatch '0x80041001') {
+            if ($_.FullyQualifiedErrorId -notmatch '0x80041001|0x80070005|0x87d00272' -Or $_.Exception.Message -notmatch '0x80041001|0x80070005|0x87d00272') {
                 $PSCmdlet.ThrowTerminatingError($_)
             }
         }
     } -ExitCondition {
         try {
             $Splat = @{
-                Filter       = 'ArticleID = "{0}"' -f [String]::Join('" OR ArticleID = "', $Update.ArticleID)
+                Filter       = 'UpdateID = "{0}"' -f [String]::Join('" OR UpdateID = "', $Update.UpdateID)
                 ErrorAction  = 'Stop'
             }
 
@@ -104,7 +104,7 @@ function Invoke-CMSoftwareUpdateInstall {
             if ($LatestUpdates.EvaluationState -match '^2$|^3$|^4$|^5$|^6$|^7$') { return $true }
         }
         catch {
-            if ($_.FullyQualifiedErrorId -match '0x80041001') {
+            if ($_.FullyQualifiedErrorId -match '0x80041001|0x80070005' -Or $_.Exception.Message -match '0x80041001|0x80070005') {
                 return $false
             }
             else {
@@ -122,12 +122,12 @@ function Invoke-CMSoftwareUpdateInstall {
         $PSCmdlet.ThrowTerminatingError($ErrorRecord)
     }
 
-    NewLoopAction -LoopTimeout $InstallUpdatesTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
+    NewLoopAction -Name 'Installing software updates' -LoopTimeout $InstallUpdatesTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 15 -LoopDelayType 'Seconds' -ScriptBlock {
         # Until all triggered updates are no longer in a state of downloading/installing
     } -ExitCondition {
         try {
             $Splat = @{
-                Filter       = 'ArticleID = "{0}"' -f [String]::Join('" OR ArticleID = "', $Update.ArticleID)
+                Filter       = 'UpdateID = "{0}"' -f [String]::Join('" OR UpdateID = "', $Update.UpdateID)
                 ErrorAction  = 'Stop'
             }
 
@@ -136,10 +136,12 @@ function Invoke-CMSoftwareUpdateInstall {
             }
 
             $LastState = Get-CMSoftwareUpdates @Splat
-            ($LastState.EvaluationState -match '^2$|^3$|^4$|^5$|^6$|^7$|^11$').Count -eq 0
+            $x = $LastState.EvaluationState -match '^2$|^3$|^4$|^5$|^6$|^7$|^11$'
+            # -match can return bool false if there's no match and there's only 1 update in $LastState
+            $x.Count -eq 0 -Or -not $x
         }
         catch {
-            if ($_.FullyQualifiedErrorId -match '0x80041001') {
+            if ($_.FullyQualifiedErrorId -match '0x80041001|0x80070005' -Or $_.Exception.Message -match '0x80041001|0x80070005') {
                 return $false
             }
             else {
