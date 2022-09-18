@@ -1,3 +1,7 @@
+| Branch | Build status | Last commit | Latest release | PowerShell Gallery | GitHub |
+|-|-|-|-|-|-|
+| `master` | [![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/codaamok/PSCMSnowflakePatching/Pipeline/master)](https://github.com/codaamok/PSCMSnowflakePatching/actions) | [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/codaamok/PSCMSnowflakePatching/master?color=blue)](https://github.com/codaamok/PSCMSnowflakePatching/commits/master) | [![GitHub release (latest by date)](https://img.shields.io/github/v/release/codaamok/PSCMSnowflakePatching?color=blue)](https://github.com/codaamok/PSCMSnowflakePatching/releases/latest) [![GitHub Release Date](https://img.shields.io/github/release-date/codaamok/PSCMSnowflakePatching?color=blue)](https://github.com/codaamok/PSCMSnowflakePatching/releases/latest) | [![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/PSCMSnowflakePatching?color=blue)](https://www.powershellgallery.com/packages/PSCMSnowflakePatching) | [![GitHub all releases](https://img.shields.io/github/downloads/codaamok/PSCMSnowflakePatching/total?color=blue)](https://github.com/codaamok/PSCMSnowflakePatching/releases) |
+
 **PSCMSnowflakePatching** is a PowerShell module used to remotely invoke the install of software updates deployed to Microsoft Endpoint Configuration Manager clients.
 
 With this module you can:
