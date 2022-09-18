@@ -1,4 +1,4 @@
-PSCMSnowflakePatching is a PowerShell module used to remotely invoke the install of software updates deployed to Microsoft Endpoint Configuration Manager clients.
+**PSCMSnowflakePatching** is a PowerShell module used to remotely invoke the install of software updates deployed to Microsoft Endpoint Configuration Manager clients.
 
 With this module you can:
 
