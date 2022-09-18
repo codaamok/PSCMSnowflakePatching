@@ -4,5 +4,16 @@ branches:
   hotfix:
     regex: ^(hot)?fix(es)?[/-]
 ignore:
-  sha: []
-merge-message-formats: {}
+  sha:
+    - 3ba1a1bcbf1a3768d6ac65c6cb2947c09e592d50
+    - 7f152e3c3ff30bda88f90ccaa95edad51a0b9927
+    - e9190277c3bbebe00a603b8b3bb3d2ae222ab4b3
+    - c05f7fde83e1d4c2f9df76b9124d712498c15fa6
+    - d3f4a2f622eaf68715c99a28d6f359d31a8444fa
+    - fd268d66f15e04269820b0e949949f183e4bc41d
+    - d09b32859c1c980b464aa1e0bfd5022286eea372
+    - e690fa3da1a53c827f4caad0dd6a5a9037148968
+    - 51f2a590c6f55b11d4ce1504a3bd2122ea925ba0
+    - 0b86bdb3d3f19b235545e1f6d21e8135d81824ba
+    - 7667aaeda597da47db0aa1502868c3691a52f118
+    - 9ee54841042bcffd6803e3f373c11c8e45fb5d09
