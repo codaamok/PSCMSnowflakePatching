@@ -108,7 +108,8 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'None'
+        ReleaseNotes = '# Fixed
+- The `NumberOfRetries` was incorrectly reported in the output object (it really is fixed this time)'
 
         # Prerelease string of this module
         # Prerelease = ''
