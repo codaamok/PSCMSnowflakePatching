@@ -52,6 +52,18 @@ function Invoke-CMSnowflakePatching {
         Specify the number of retries you would like to script to make when a software update install failure is detected.
         In other words, if software updates fail to install, and you specify 2 for the Retry parameter, the script will
         retry installation twice.
+    .PARAMETER RebootTimeoutMins
+        How long to wait for a host to become responsive again after reboot.
+        This parameter is hidden from tab completion.
+    .PARAMETER InstallUpdatesTimeoutMins
+        How long to wait for a successful execution of the Software Update Scan Cycle after update install/reboot
+        This parameter is hidden from tab completion.
+    .PARAMETER SoftwareUpdateScanCycleTimeoutMins
+        How long to wait for updates to begin installing after invoking them to begin installing
+        This parameter is hidden from tab completion.
+    .PARAMETER InvokeSoftwareUpdateInstallTimeoutMins
+        How long to wait for installing software updates on a host
+        This parameter is hidden from tab completion.
     .EXAMPLE
         Invoke-CMSnowflakePatching -ComputerName 'ServerA', 'ServerB' -AllowReboot
 
@@ -101,19 +113,24 @@ function Invoke-CMSnowflakePatching {
                 $true
             }
         })]
-        [Int]$Retry
+        [Int]$Retry,
+
+        [Parameter(DontShow)]
+        [Int]$RebootTimeoutMins = 120,
+
+        [Parameter(DontShow)]
+        [Int]$InstallUpdatesTimeoutMins = 720,
+
+        [Parameter(DontShow)]
+        [Int]$SoftwareUpdateScanCycleTimeoutMins = 15,
+
+        [Parameter(DontShow)]
+        [Int]$InvokeSoftwareUpdateInstallTimeoutMins = 5
     )
 
     #region Define PSDefaultParameterValues, other variables, and enums
     $JobId = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
     $StartTime = Get-Date
-
-    # NewLoopAction function is the primary looping function in this script
-    # The below variables configure the function's timeout values where appropriate
-    $RebootTimeoutMins = 120 # How long to wait for a host to become responsive again after reboot
-    $SoftwareUpdateScanCycleTimeoutMins = 15 # How long to wait for a successful execution of the Software Update Scan Cycle after update install/reboot
-    $InvokeSoftwareUpdateInstallTimeoutMins = 5 # How long to wait for updates to begin installing after invoking them to begin installing
-    $InstallUpdatesTimeoutMins = 720 # How long to wait for installing software updates on a host
 
     $PSDefaultParameterValues = @{
         'WriteCMLogEntry:Bias'                 = (Get-CimInstance -ClassName Win32_TimeZone | Select-Object -ExpandProperty Bias)
@@ -275,8 +292,6 @@ function Invoke-CMSnowflakePatching {
                     $AllUpdates      = @{}
 
                     & $Module NewLoopAction -Iterations $Iterations -LoopDelay 30 -LoopDelayType 'Seconds' -ScriptBlock {
-                        $AttemptsCounter++
-
                         if ($AttemptsCounter -gt 1) {
                             # Get a fresh collection of available updates to install because if some updates successfully installed _and_ failed 
                             # in the last iteration then we will get an error about trying to install updates that are already installed, whereas
@@ -412,6 +427,7 @@ function Invoke-CMSnowflakePatching {
                                 } else { 
                                     # If this occurs, the iterations on the loop will exceed and the IfTimeoutScript script block will be invoked, 
                                     # thus reporting back one or more updates failed
+                                    $AttemptsCounter++
                                     return $false 
                                 }
                             }
@@ -429,7 +445,7 @@ function Invoke-CMSnowflakePatching {
                             )
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter - 1
+                            NumberOfRetries = $AttemptsCounter
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
@@ -438,7 +454,7 @@ function Invoke-CMSnowflakePatching {
                             Updates         = $AllUpdates.Values | Select-Object Name, ArticleID
                             IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
                             NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter - 1
+                            NumberOfRetries = $AttemptsCounter
                         }
                     }
                 }
