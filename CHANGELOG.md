@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2022-09-19
+
 ### Fixed
 - The `NumberOfRetries` was incorrectly reported in the output object (it really is fixed this time)
 
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[Unreleased]: https://github.com/codaamok/PSCMSnowflakePatching/compare/0.1.1..HEAD
+[Unreleased]: https://github.com/codaamok/PSCMSnowflakePatching/compare/0.1.2..HEAD
+[0.1.2]: https://github.com/codaamok/PSCMSnowflakePatching/compare/0.1.1..0.1.2
 [0.1.1]: https://github.com/codaamok/PSCMSnowflakePatching/compare/0.1.0..0.1.1
 [0.1.0]: https://github.com/codaamok/PSCMSnowflakePatching/tree/0.1.0
