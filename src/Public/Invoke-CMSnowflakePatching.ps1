@@ -28,7 +28,7 @@ function Invoke-CMSnowflakePatching {
         whether a pending reboot is required, and how many times a system rebooted and how
         many times software update installations were retried.
 
-        A system can be allowed to reboot and retry multiple times with the AllowReboot or Retry parameter (or both).
+        A system can be allowed to reboot and retry multiple times with the AllowReboot or Attempts parameter (or both).
 
         It is recommended you read my blog post to understand the various ways in how you can use this function: 
         https://adamcook.io/p/patching-snowflakes-with-configMgr-and-powerShell
@@ -48,10 +48,10 @@ function Invoke-CMSnowflakePatching {
         after all updates have finished installing. By default, the function will not reboot the system(s). 
         More often than not, reboots are required in order to finalise software update installation. Using this switch
         and allowing the system(s) to reboot if required ensures a complete patch cycle.
-    .PARAMETER Retry
+    .PARAMETER Attempts
         Specify the number of retries you would like to script to make when a software update install failure is detected.
-        In other words, if software updates fail to install, and you specify 2 for the Retry parameter, the script will
-        retry installation twice.
+        In other words, if software updates fail to install, and you specify 2 for the Attempts parameter, the script will
+        attempts installation twice. The default value is 1.
     .PARAMETER RebootTimeoutMins
         How long to wait for a host to become responsive again after reboot.
         This parameter is hidden from tab completion.
@@ -106,14 +106,14 @@ function Invoke-CMSnowflakePatching {
 
         [Parameter()]
         [ValidateScript({
-            if ($_ -lt 1) {
-                throw 'Retry cannot be less than 1'
+            if ($_ -le 0) {
+                throw 'Attempts cannot be 0 or less. If you do not want any retry attempts, omit the parameter.'
             }
             else {
                 $true
             }
         })]
-        [Int]$Retry,
+        [Int]$Attempts = 1,
 
         [Parameter(DontShow)]
         [Int]$RebootTimeoutMins = 120,
@@ -147,7 +147,7 @@ function Invoke-CMSnowflakePatching {
 
     WriteCMLogEntry -Value ('ParameterSetName: {0}' -f $PSCmdlet.ParameterSetName) -Component 'Initialisation'
     WriteCMLogEntry -Value ('ForceReboot: {0}' -f $AllowReboot.IsPresent) -Component 'Initialisation'
-    WriteCMLogEntry -Value ('Retries: {0}' -f $Retry) -Component 'Initialisation'
+    WriteCMLogEntry -Value ('Attempts: {0}' -f $Attempts) -Component 'Initialisation'
 
     if ($PSCmdlet.ParameterSetName -ne 'ByComputerName') {
         $PSDrive = (Get-PSDrive -PSProvider CMSite)[0]
@@ -243,16 +243,6 @@ function Invoke-CMSnowflakePatching {
         }
     }
 
-    # 'Retry' actually means number of attempts, which will default to 1
-    # This is a juggling act of trying to simplify UX in the -Retry parameter name
-    # versus my stubborn and tiredness to think of something better
-    $Retry = if ($PSBoundParameters.ContainsKey('Retry')) {
-        if ($Retry -eq 1) { 2 } else { $Retry }
-    }
-    else {
-        1
-    }
-
     $Jobs = foreach ($Member in $CollectionMembers) {
         $StartJobSplat = @{
             Name                 = $Member.Name
@@ -260,7 +250,7 @@ function Invoke-CMSnowflakePatching {
             ArgumentList         = @(
                 $Member.Name, 
                 $AllowReboot.IsPresent, 
-                $Retry, 
+                $Attempts, 
                 $InvokeSoftwareUpdateInstallTimeoutMins, 
                 $InstallUpdatesTimeoutMins,
                 $RebootTimeoutMins
@@ -270,7 +260,7 @@ function Invoke-CMSnowflakePatching {
                 param (
                     [String]$ComputerName,
                     [Bool]$AllowReboot,
-                    [Int]$Retry,
+                    [Int]$Attempts,
                     [Int]$InvokeSoftwareUpdateInstallTimeoutMins,
                     [Int]$InstallUpdatesTimeoutMins,
                     [Int]$RebootTimeoutMins
@@ -286,12 +276,14 @@ function Invoke-CMSnowflakePatching {
                 [CimInstance[]]$UpdatesToInstall = Get-CMSoftwareUpdates @GetCMSoftwareUpdatesSplat
                         
                 if ($UpdatesToInstall.Count -gt 0) {
-                    $Iterations      = $Retry
+                    $Iterations      = $Attempts
                     $RebootCounter   = 0
                     $AttemptsCounter = 0
                     $AllUpdates      = @{}
 
                     & $Module NewLoopAction -Iterations $Iterations -LoopDelay 30 -LoopDelayType 'Seconds' -ScriptBlock {
+                        $AttemptsCounter++
+
                         if ($AttemptsCounter -gt 1) {
                             # Get a fresh collection of available updates to install because if some updates successfully installed _and_ failed 
                             # in the last iteration then we will get an error about trying to install updates that are already installed, whereas
@@ -419,7 +411,6 @@ function Invoke-CMSnowflakePatching {
                                     return $true
                                 }
                                 else {
-                                    $AttemptsCounter++
                                     return $false 
                                 }
                             }
@@ -433,7 +424,6 @@ function Invoke-CMSnowflakePatching {
                                 } else { 
                                     # If this occurs, the iterations on the loop will exceed and the IfTimeoutScript script block will be invoked, 
                                     # thus reporting back one or more updates failed
-                                    $AttemptsCounter++
                                     return $false 
                                 }
                             }
@@ -441,26 +431,26 @@ function Invoke-CMSnowflakePatching {
                         
                     } -IfTimeoutScript {
                         [PSCustomObject]@{
-                            ComputerName    = $ComputerName
-                            Result          = 'Failure'
-                            Updates         = $AllUpdates.Values | Select-Object -Property @(
+                            ComputerName     = $ComputerName
+                            Result           = 'Failure'
+                            Updates          = $AllUpdates.Values | Select-Object -Property @(
                                 "Name"
                                 "ArticleID"
                                 @{Name = 'EvaluationState'; Expression = { $_.EvaluationStateStr }}
                                 "ErrorCode"
                             )
-                            IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
-                            NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter
+                            IsPendingReboot  = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
+                            NumberOfReboots  = $RebootCounter
+                            NumberOfAttempts = $AttemptsCounter
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
-                            ComputerName    = $ComputerName
-                            Result          = 'Success'
-                            Updates         = $AllUpdates.Values | Select-Object Name, ArticleID
-                            IsPendingReboot = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
-                            NumberOfReboots = $RebootCounter
-                            NumberOfRetries = $AttemptsCounter
+                            ComputerName     = $ComputerName
+                            Result           = 'Success'
+                            Updates          = $AllUpdates.Values | Select-Object Name, ArticleID
+                            IsPendingReboot  = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
+                            NumberOfReboots  = $RebootCounter
+                            NumberOfAttempts = $AttemptsCounter
                         }
                     }
                 }

@@ -67,8 +67,9 @@ Within the `$result` variable is the output object, which could be handy for you
 By default it doesn't reboot or make any retry attempts, but there parameters for this if you need it:
 
 - `-AllowReboot` switch will reboot the system(s) if any update returned an exit code indicating a reboot is required
-- `-Retry` parameter will let you indicate the maximum number of retries you would like the function to install updates if there was a failure in the previous attempt
+- `-Attempts` parameter will let you indicate the maximum number of retries you would like the function to install updates if there was a failure in the previous attempt
 
 ## To do
 
 - Pass a filter of update name, article IDs, or update IDs, to `Invoke-CMSnowflakePatching` to specify which updates to install
+- Consider using PendingReboot or Test-PendingReboot from the gallery to make the `IsPendingReboot` reflect more than just the newly installed updates exit code
