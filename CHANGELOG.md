@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The `NumberOfRetries` was incorrectly reported in the output object (it really is fixed this time)
+
 ## [0.1.1] - 2022-09-19
 ### Added
 - New parameters for `Invoke-CMSnowflakePatching`: `RebootTimeoutMins`, `InstallUpdatesTimeoutMins`, `SoftwareUpdateScanCycleTimeoutMins`, `InvokeSoftwareUpdateInstallTimeoutMins`. These were previously hardcoded values within the function.

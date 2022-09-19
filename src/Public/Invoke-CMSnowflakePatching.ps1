@@ -415,7 +415,13 @@ function Invoke-CMSnowflakePatching {
                         switch ($AllowReboot) {
                             $true {
                                 # If updates are successfully installed, they will no longer appear in WMI
-                                if ($LatestUpdates.Count -eq 0) { return $true }
+                                if ($LatestUpdates.Count -eq 0) { 
+                                    return $true
+                                }
+                                else {
+                                    $AttemptsCounter++
+                                    return $false 
+                                }
                             }
                             $false {
                                 # Don't want anything other than pending hard/soft reboot, or installed
