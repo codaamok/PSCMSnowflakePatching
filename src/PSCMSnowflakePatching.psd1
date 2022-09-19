@@ -12,7 +12,7 @@
 RootModule = 'PSCMSnowflakePatching.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.2'
+ModuleVersion = '0.2.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -108,8 +108,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = '# Fixed
-- The `NumberOfRetries` was incorrectly reported in the output object (it really is fixed this time)'
+        ReleaseNotes = 'None'
 
         # Prerelease string of this module
         # Prerelease = ''

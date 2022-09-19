@@ -14,14 +14,14 @@ Invoke software update installation for a ConfigMgr client, an array of clients,
 
 ### ByChoosingConfigMgrCollection (Default)
 ```
-Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Retry <Int32>] [-RebootTimeoutMins <Int32>]
+Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Attempts <Int32>] [-RebootTimeoutMins <Int32>]
  [-InstallUpdatesTimeoutMins <Int32>] [-SoftwareUpdateScanCycleTimeoutMins <Int32>]
  [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>] [<CommonParameters>]
 ```
 
 ### ByComputerName
 ```
-Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Retry <Int32>]
+Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Attempts <Int32>]
  [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
  [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
  [<CommonParameters>]
@@ -29,9 +29,10 @@ Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Retry <Int3
 
 ### ByConfigMgrCollectionId
 ```
-Invoke-CMSnowflakePatching -CollectionId <String> [-AllowReboot] [-Retry <Int32>] [-RebootTimeoutMins <Int32>]
- [-InstallUpdatesTimeoutMins <Int32>] [-SoftwareUpdateScanCycleTimeoutMins <Int32>]
- [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>] [<CommonParameters>]
+Invoke-CMSnowflakePatching -CollectionId <String> [-AllowReboot] [-Attempts <Int32>]
+ [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
+ [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -66,7 +67,7 @@ It will contain properties such as result, updates installed,
 whether a pending reboot is required, and how many times a system rebooted and how
 many times software update installations were retried.
 
-A system can be allowed to reboot and retry multiple times with the AllowReboot or Retry parameter (or both).
+A system can be allowed to reboot and retry multiple times with the AllowReboot or Attempts parameter (or both).
 
 It is recommended you read my blog post to understand the various ways in how you can use this function: 
 https://adamcook.io/p/patching-snowflakes-with-configMgr-and-powerShell
@@ -173,10 +174,11 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Retry
+### -Attempts
 Specify the number of retries you would like to script to make when a software update install failure is detected.
-In other words, if software updates fail to install, and you specify 2 for the Retry parameter, the script will
-retry installation twice.
+In other words, if software updates fail to install, and you specify 2 for the Attempts parameter, the script will
+attempts installation twice.
+The default value is 1.
 
 ```yaml
 Type: Int32
@@ -185,7 +187,7 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: 0
+Default value: 1
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
