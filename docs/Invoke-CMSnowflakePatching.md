@@ -14,17 +14,24 @@ Invoke software update installation for a ConfigMgr client, an array of clients,
 
 ### ByChoosingConfigMgrCollection (Default)
 ```
-Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Retry <Int32>] [<CommonParameters>]
+Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Retry <Int32>] [-RebootTimeoutMins <Int32>]
+ [-InstallUpdatesTimeoutMins <Int32>] [-SoftwareUpdateScanCycleTimeoutMins <Int32>]
+ [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>] [<CommonParameters>]
 ```
 
 ### ByComputerName
 ```
-Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Retry <Int32>] [<CommonParameters>]
+Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Retry <Int32>]
+ [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
+ [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
+ [<CommonParameters>]
 ```
 
 ### ByConfigMgrCollectionId
 ```
-Invoke-CMSnowflakePatching -CollectionId <String> [-AllowReboot] [-Retry <Int32>] [<CommonParameters>]
+Invoke-CMSnowflakePatching -CollectionId <String> [-AllowReboot] [-Retry <Int32>] [-RebootTimeoutMins <Int32>]
+ [-InstallUpdatesTimeoutMins <Int32>] [-SoftwareUpdateScanCycleTimeoutMins <Int32>]
+ [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -179,6 +186,70 @@ Aliases:
 Required: False
 Position: Named
 Default value: 0
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RebootTimeoutMins
+How long to wait for a host to become responsive again after reboot.
+This parameter is hidden from tab completion.
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: 120
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -InstallUpdatesTimeoutMins
+How long to wait for a successful execution of the Software Update Scan Cycle after update install/reboot
+This parameter is hidden from tab completion.
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: 720
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SoftwareUpdateScanCycleTimeoutMins
+How long to wait for updates to begin installing after invoking them to begin installing
+This parameter is hidden from tab completion.
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: 15
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -InvokeSoftwareUpdateInstallTimeoutMins
+How long to wait for installing software updates on a host
+This parameter is hidden from tab completion.
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: 5
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
