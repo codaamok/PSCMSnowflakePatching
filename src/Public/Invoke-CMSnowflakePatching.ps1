@@ -323,11 +323,13 @@ function Invoke-CMSnowflakePatching {
                                         Filter       = 'Name = "ccmexec" OR Name = "winmgmt" OR Name = "netlogon"'
                                     }
                                     $ServicesState = Get-CimInstance @Splat
+
+                                    $null = Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop'
     
                                     if (
+                                        $? -And
                                         $ServicesState.Count -eq 3 -And 
-                                        ($ServicesState.State -eq 'Running').Count -eq 3 -And
-                                        (Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop')
+                                        ($ServicesState.State -eq 'Running').Count -eq 3
                                     ) {
                                         return $true
                                     }
