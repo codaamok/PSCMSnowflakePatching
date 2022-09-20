@@ -95,6 +95,10 @@ task InitaliseBuildDirectory {
 task CopyChangeLog {
     Copy-Item -Path $BuildRoot\CHANGELOG.md -Destination $BuildRoot\build\$Script:ModuleName\CHANGELOG.md
     $Script:ChangeLogData = Get-ChangeLogData -Path $BuildRoot\CHANGELOG.md
+    Write-Verbose "Change log data is:" -Verbose
+    Write-Verbose $Script:ChangeLogData -Verbose
+    Write-Verbose "Contents of changelog.md is:" -Verbose
+    Write-Verbose (Get-Content $BuildRoot\CHANGELOG.md) -Verbose
     Export-UnreleasedNotes -Path $BuildRoot\release\releasenotes.txt -ChangeLogData $Script:ChangeLogData -NewRelease $Script:NewRelease
 }
 
