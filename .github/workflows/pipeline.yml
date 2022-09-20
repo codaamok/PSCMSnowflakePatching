@@ -39,9 +39,6 @@ jobs:
           Invoke-Build -File "invoke.build.ps1" -ModuleName $ProjectName -Author $Username -Task "InstallDependencies","ImportBuildModule","SetGitHubActionEnvironmentVariables"
         shell: pwsh
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Build
         run: |
           $Params = @{
