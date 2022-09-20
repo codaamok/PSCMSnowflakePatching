@@ -100,9 +100,9 @@ task CopyChangeLog {
     Write-Verbose "Contents of changelog.md is:" -Verbose
     Write-Verbose (Get-Content $BuildRoot\CHANGELOG.md -Raw) -Verbose
     Write-Verbose "Contents of release folder" -Verbose
-    Get-ChildItem $BuildRoot\release
-    Write-Verbose "Contents of buildroot"
-    Get-ChildItem $BuildRoot
+    (Get-ChildItem $BuildRoot\release).Name
+    Write-Verbose "Contents of buildroot" -Verbose
+    (Get-ChildItem $BuildRoot).Name
     Export-UnreleasedNotes -Path $BuildRoot\release\releasenotes.txt -ChangeLogData $Script:ChangeLogData -NewRelease $Script:NewRelease
 }
 
