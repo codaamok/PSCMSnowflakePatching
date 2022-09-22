@@ -196,7 +196,7 @@ function Invoke-CMSnowflakePatching {
                         $Exception = [System.ArgumentException]::new('Did not find a device collection with ID {0}' -f $CollectionId)
                         $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
                             $Exception,
-                            $null,
+                            0,
                             [System.Management.Automation.ErrorCategory]::ObjectNotFound,
                             $ComputerName
                         )
@@ -315,8 +315,6 @@ function Invoke-CMSnowflakePatching {
                                 # Wait for SMS Agent Host to startup and for relevant ConfigMgr WMI classes to become available
                             } -ExitCondition {
                                 try {
-                                    #$null = Get-CMSoftwareUpdates -ComputerName $ComputerName -ErrorAction 'Stop'
-                                    #return $true
                                     $Splat = @{
                                         ComputerName = $ComputerName
                                         ClassName    = 'Win32_Service'
@@ -339,7 +337,7 @@ function Invoke-CMSnowflakePatching {
                                 $Exception = [System.TimeoutException]::new('Timeout while waiting for {0} to reboot' -f $ComputerName)
                                 $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
                                     $Exception,
-                                    $null,
+                                    0,
                                     [System.Management.Automation.ErrorCategory]::OperationTimeout,
                                     $ComputerName
                                 )
@@ -348,9 +346,8 @@ function Invoke-CMSnowflakePatching {
                             
                         }
                     } -ExitCondition {
-                        if ($Result.EvaluationState -notmatch '^8$|^9$|^13$') {
-                            # Don't bother doing ScanByUpdateSource if all the updates are in failed or pending reboot state
-                            # The point of this is to get updates out of WMI if they're successful/complete w/o pending reboot
+                        if ($Result.EvaluationState -notmatch '^13$') {
+                            # Don't bother doing ScanByUpdateSource if all the updates are in a failed state
                             & $Module NewLoopAction -LoopTimeout $SoftwareUpdateScanCycleTimeoutMins -LoopTimeoutType 'Minutes' -LoopDelay 1 -LoopDelayType 'Seconds' -ScriptBlock { } -ExitCondition {
                                 try {
                                     Start-CMClientAction -ComputerName $ComputerName -ScheduleId 'ScanByUpdateSource' -ErrorAction 'Stop'
@@ -372,7 +369,7 @@ function Invoke-CMSnowflakePatching {
                                 $Exception = [System.TimeoutException]::new('Timeout while trying to invoke Software Update Scan Cycle for {0}' -f $ComputerName)
                                 $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
                                     $Exception,
-                                    $null,
+                                    0,
                                     [System.Management.Automation.ErrorCategory]::OperationTimeout,
                                     $ComputerName
                                 )
