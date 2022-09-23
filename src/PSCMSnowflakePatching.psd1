@@ -12,7 +12,7 @@
 RootModule = 'PSCMSnowflakePatching.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.0'
+ModuleVersion = '0.4.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -109,9 +109,7 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = '# Added
-- New properties added to output object: OperatingSystem (hidden), PingResponse (hidden), LastBootUpTime (hidden), and TotalTime.
-# Fixed
-- Property NumberOfAttempts was missing from output object if there were no updates to install on target host. Old and unused property name NumberOfRetries was there instead.'
+- New parameter -UpdateNameFilter for Invoke-CMSnowflakePatching'
 
         # Prerelease string of this module
         # Prerelease = ''
