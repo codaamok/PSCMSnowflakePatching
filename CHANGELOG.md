@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- New properties added to output object: `OperatingSystem` (hidden), `PingResponse` (hidden), `LastBootUpTime` (hidden), and `TotalTime`.
+
+### Fixed
+- Property `NumberOfAttempts` was missing from output object if there were no updates to install on target host. Old and unused property name `NumberOfRetries` was there instead.
 
 ## [0.2.2] - 2022-09-22
 ### Fixed

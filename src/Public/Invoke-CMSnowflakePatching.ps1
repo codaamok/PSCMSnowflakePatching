@@ -150,7 +150,7 @@ function Invoke-CMSnowflakePatching {
     WriteCMLogEntry -Value ('Attempts: {0}' -f $Attempts) -Component 'Initialisation'
 
     if ($PSCmdlet.ParameterSetName -ne 'ByComputerName') {
-        $PSDrive = (Get-PSDrive -PSProvider CMSite)[0]
+        $PSDrive = (Get-PSDrive -PSProvider CMSite -ErrorAction 'Stop')[0]
         $CMDrive = '{0}:\' -f $PSDrive.Name
         Push-Location $CMDrive
 
@@ -430,7 +430,11 @@ function Invoke-CMSnowflakePatching {
                         
                     } -IfTimeoutScript {
                         [PSCustomObject]@{
+                            PSTypeName       = 'PSCMSnowflakePatchingResult'
                             ComputerName     = $ComputerName
+                            OperatingSystem  = & $Module GetOS -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
+                            PingResponse     = Test-Connection -ComputerName $ComputerName -Count 3 -Quiet
+                            LastBootUpTime   = & $Module GetBootTime -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
                             Result           = 'Failure'
                             Updates          = $AllUpdates.Values | Select-Object -Property @(
                                 "Name"
@@ -444,7 +448,11 @@ function Invoke-CMSnowflakePatching {
                         }
                     } -IfSucceedScript {
                         [PSCustomObject]@{
+                            PSTypeName       = 'PSCMSnowflakePatchingResult'
                             ComputerName     = $ComputerName
+                            OperatingSystem  = & $Module GetOS -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
+                            PingResponse     = Test-Connection -ComputerName $ComputerName -Count 3 -Quiet
+                            LastBootUpTime   = & $Module GetBootTime -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
                             Result           = 'Success'
                             Updates          = $AllUpdates.Values | Select-Object Name, ArticleID
                             IsPendingReboot  = $LatestUpdates.EvaluationState -match '^8$|^9$' -as [bool]
@@ -455,12 +463,16 @@ function Invoke-CMSnowflakePatching {
                 }
                 else {
                     [PSCustomObject]@{
+                        PSTypeName      = 'PSCMSnowflakePatchingResult'
                         ComputerName    = $ComputerName
+                        OperatingSystem = & $Module GetOS -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
+                        PingResponse    = Test-Connection -ComputerName $ComputerName -Count 3 -Quiet
+                        LastBootUpTime  = & $Module GetBootTime -ComputerName $ComputerName -ErrorAction 'SilentlyContinue'
                         Result          = 'n/a'
                         Updates         = $null
                         IsPendingReboot = $false
                         NumberOfReboots = 0
-                        NumberOfRetries = 0
+                        NumberOfAttempts = 0
                     }
                 }
             }
@@ -495,7 +507,8 @@ function Invoke-CMSnowflakePatching {
                     ($_Job.State -eq 'Completed' -And $CompletedJobs -notcontains $_Job.Name) {
                         $CompletedJobs.Add($_Job.Name)
                         $Data = $_Job | Receive-Job -Keep
-                        $Data
+                        $TimeSpan = New-TimeSpan -Start $_Job.PSBeginTIme -End $_Job.PSEndTime
+                        $Data | Add-Member -MemberType NoteProperty -Name 'TotalTime' -Value $TimeSpan -PassThru
 
                         switch ($Data.Result) {
                             'n/a' {
