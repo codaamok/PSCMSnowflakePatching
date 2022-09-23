@@ -72,5 +72,4 @@ By default it doesn't reboot or make any retry attempts, but there parameters fo
 ## To do
 
 - Pass alternate credentials for connecting to remote hosts
-- Pass a filter of update name, article IDs, or update IDs, to `Invoke-CMSnowflakePatching` to specify which updates to install
 - Consider using PendingReboot or Test-PendingReboot from the gallery to make the `IsPendingReboot` reflect more than just the newly installed updates exit code

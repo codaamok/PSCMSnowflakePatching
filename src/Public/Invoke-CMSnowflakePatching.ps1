@@ -52,6 +52,10 @@ function Invoke-CMSnowflakePatching {
         Specify the number of retries you would like to script to make when a software update install failure is detected.
         In other words, if software updates fail to install, and you specify 2 for the Attempts parameter, the script will
         attempts installation twice. The default value is 1.
+    .PARAMETER UpdateNameFilter
+        One or more strings used to filter the updates you want to invoke the installation of based on name.
+        It is advised to either provide full or partial strings of the match you need. The function wraps wildcards around the filter.
+        For example, if you provide '7-Zip', the function will search for available updates with '%7-Zip%'.
     .PARAMETER RebootTimeoutMins
         How long to wait for a host to become responsive again after reboot.
         This parameter is hidden from tab completion.
@@ -114,6 +118,17 @@ function Invoke-CMSnowflakePatching {
             }
         })]
         [Int]$Attempts = 1,
+
+        [Parameter()]
+        [ValidateScript({
+            if ($_ -match '%') {
+                throw 'String can not contain character %'
+            }
+            else {
+                $true
+            }
+        })]
+        [String[]]$UpdateNameFilter,
 
         [Parameter(DontShow)]
         [Int]$RebootTimeoutMins = 120,
@@ -250,7 +265,8 @@ function Invoke-CMSnowflakePatching {
             ArgumentList         = @(
                 $Member.Name, 
                 $AllowReboot.IsPresent, 
-                $Attempts, 
+                $Attempts,
+                (,$UpdateNameFilter),
                 $InvokeSoftwareUpdateInstallTimeoutMins, 
                 $InstallUpdatesTimeoutMins,
                 $RebootTimeoutMins
@@ -261,6 +277,7 @@ function Invoke-CMSnowflakePatching {
                     [String]$ComputerName,
                     [Bool]$AllowReboot,
                     [Int]$Attempts,
+                    [String[]]$UpdateNameFilter,
                     [Int]$InvokeSoftwareUpdateInstallTimeoutMins,
                     [Int]$InstallUpdatesTimeoutMins,
                     [Int]$RebootTimeoutMins
@@ -268,9 +285,19 @@ function Invoke-CMSnowflakePatching {
 
                 $Module = Get-Module 'PSCMSnowflakePatching'
 
+                
+
+                if (-not [String]::IsNullOrWhiteSpace($UpdateNameFilter)) {
+                    $Filter = 'ComplianceState = 0 AND (EvaluationState = 0 OR EvaluationState = 1 OR EvaluationState = 13) AND (Name LIKE "%{0}%")' -f
+                        [String]::Join('%" OR Name LIKE "%', $UpdateNameFilter)
+                }
+                else {
+                    $Filter = 'ComplianceState = 0 AND (EvaluationState = 0 OR EvaluationState = 1 OR EvaluationState = 13)'
+                }
+
                 $GetCMSoftwareUpdatesSplat = @{
                     ComputerName = $ComputerName
-                    Filter       = 'ComplianceState = 0 AND (EvaluationState = 0 OR EvaluationState = 1 OR EvaluationState = 13)'
+                    Filter       = $Filter
                     ErrorAction  = 'Stop'
                 }
                 [CimInstance[]]$UpdatesToInstall = Get-CMSoftwareUpdates @GetCMSoftwareUpdatesSplat

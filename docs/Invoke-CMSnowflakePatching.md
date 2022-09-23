@@ -14,15 +14,16 @@ Invoke software update installation for a ConfigMgr client, an array of clients,
 
 ### ByChoosingConfigMgrCollection (Default)
 ```
-Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Attempts <Int32>] [-RebootTimeoutMins <Int32>]
- [-InstallUpdatesTimeoutMins <Int32>] [-SoftwareUpdateScanCycleTimeoutMins <Int32>]
- [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>] [<CommonParameters>]
+Invoke-CMSnowflakePatching [-ChooseCollection] [-AllowReboot] [-Attempts <Int32>]
+ [-UpdateNameFilter <String[]>] [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
+ [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
+ [<CommonParameters>]
 ```
 
 ### ByComputerName
 ```
 Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Attempts <Int32>]
- [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
+ [-UpdateNameFilter <String[]>] [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
  [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
  [<CommonParameters>]
 ```
@@ -30,7 +31,7 @@ Invoke-CMSnowflakePatching -ComputerName <String[]> [-AllowReboot] [-Attempts <I
 ### ByConfigMgrCollectionId
 ```
 Invoke-CMSnowflakePatching -CollectionId <String> [-AllowReboot] [-Attempts <Int32>]
- [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
+ [-UpdateNameFilter <String[]>] [-RebootTimeoutMins <Int32>] [-InstallUpdatesTimeoutMins <Int32>]
  [-SoftwareUpdateScanCycleTimeoutMins <Int32>] [-InvokeSoftwareUpdateInstallTimeoutMins <Int32>]
  [<CommonParameters>]
 ```
@@ -188,6 +189,24 @@ Aliases:
 Required: False
 Position: Named
 Default value: 1
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -UpdateNameFilter
+One or more strings used to filter the updates you want to invoke the installation of based on name.
+It is advised to either provide full or partial strings of the match you need.
+The function wraps wildcards around the filter.
+For example, if you provide '7-Zip', the function will search for available updates with '%7-Zip%'.
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
